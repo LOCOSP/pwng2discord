@@ -38,7 +38,7 @@ class DiscordInfo(plugins.Plugin):
             return
 
 
-        ssid = access_point["essid"]
+        ssid = access_point["hostname"]
         bssid = access_point["mac"]
         message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {filename}"
 
