@@ -1,7 +1,5 @@
-import logging
-import os
-import requests # type: ignore
-from pwnagotchi import plugins # type: ignore
+import logging, requests, pwnagotchi, os, glob, time, re, json
+from pwnagotchi import plugins
 
 class DiscordInfo(plugins.Plugin):
     __author__ = 'LOCOSP'
@@ -12,58 +10,87 @@ class DiscordInfo(plugins.Plugin):
     def __init__(self):
         self.ready = False
 
-    def on_loaded(self):
-        # Check if the plugin is enabled in the config
-        if 'enabled' not in self.options or not self.options['enabled']:
-            logging.info("DiscordInfo: Plugin is disabled in the config")
-            return
-
-        # Check if webhook_url is provided in config
+    def on_config_changed(self, config):
+        self.config = config
+        
+    def on_ready(self, agent):
         if 'webhook_url' not in self.options or not self.options['webhook_url']:
             logging.error("DiscordInfo: Webhook URL is not set, cannot post to Discord")
             return
-        
-        # Set the username from options or default to hostname
         if 'username' not in self.options or not self.options['username']:
             with open('/etc/hostname') as fp:
                 self.options['username'] = fp.read().strip()
-
         self.ready = True
         logging.info("DiscordInfo: Plugin loaded and ready")
 
     def on_handshake(self, agent, filename, access_point, client_station):
-        logging.info("DiscordInfo: handshake received")
-        if self.ready and self.is_enabled():
-            ssid = access_point["hostname"]
-            bssid = access_point["mac"]
-            message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {filename}"
-            logging.info(f"DiscordInfo: Sending message to Discord: {message}")
-            self.send_message(message)
-        else:
+        logging.info("DiscordInfo: Handshake received")
+        if not self.ready:
             logging.warning("DiscordInfo: Plugin not ready or disabled, cannot send message")
+            return
+        ssid = access_point.get("hostname", "Unknown SSID")
+        bssid = access_point.get("mac", "Unknown BSSID")
+        message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {filename}"
+        time.sleep(2)
+        logging.debug(f"DiscordInfo: Sending message to Discord: {message}")
+        handshake_base = os.path.splitext(filename)[0]
+        h22000_files = glob.glob(f"{handshake_base}*.22000")
+        if not h22000_files:
+            logging.debug(f"DiscordInfo: No matching .22000 file found for {filename}")
+        else:
+            h22000_filepath = h22000_files[0]
+            message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {h22000_filepath}"
+            logging.debug(f"DiscordInfo: Found matching .22000 file: {h22000_filepath}")
+        lat, lng, google_maps_link = self._get_location_info(ssid, bssid)
+        if google_maps_link:
+            message += f"\nLocation: [{lat}, {lng}](<{google_maps_link}>)"
+            logging.debug(f"DiscordInfo: Added location data to message: {google_maps_link}")
+        else:
+            logging.debug("DiscordInfo: No location data found, not adding to message.")
+        self.send_message(message, h22000_filepath)
 
-    def is_enabled(self):
-        # Check if the plugin is enabled in the config
-        return 'enabled' in self.options and self.options['enabled']
-
-    def send_message(self, message):
+    def send_message(self, message, filepath=None):
         try:
             url = self.options['webhook_url']
-            username = self.options['username']  # Use the configurable username
+            username = self.options['username']
             data = {
                 "content": message,
                 "username": username
             }
-            response = requests.post(url, json=data)
-            if response.status_code == 204:
-                logging.info("DiscordInfo: Message successfully sent to Discord")
+            if filepath and os.path.exists(filepath):
+                with open(filepath, 'rb') as file:
+                    files = {
+                        'file': (os.path.basename(filepath), file, 'application/octet-stream')
+                    }
+                    response = requests.post(url, data=data, files=files)
+            else:
+                response = requests.post(url, json=data)
+            if response.status_code in [200, 204]:
+                logging.debug("DiscordInfo: Message successfully sent to Discord")
             else:
                 logging.error(f"DiscordInfo: Failed to send message to Discord, status code: {response.status_code}, response: {response.text}")
         except requests.exceptions.RequestException as e:
             logging.exception(f"DiscordInfo: Exception occurred while sending the message: {e}")
         except Exception as e:
             logging.exception(f"DiscordInfo: Unexpected exception occurred: {e}")
+            
+    def _get_location_info(self, ssid, bssid):
+        ssid = re.sub(r'\W+', '', ssid)
+        bssid = bssid.replace(':', '')
+        geojson_file = f"{self.config['bettercap']['handshakes']}{ssid}_{bssid}.gps.json"
+        if os.path.exists(geojson_file):
+            logging.debug(f"DiscordInfo: Found geo.json file: {geojson_file}")
+            with open(geojson_file, 'r') as geo_file:
+                data = json.load(geo_file)
+            if data is not None:
+                lat = data.get('Latitude') or data.get('location', {}).get('lat')
+                lng = data.get('Longitude') or data.get('location', {}).get('lng')
+                if lat is not None and lng is not None:
+                    google_maps_link = f"https://www.google.com/maps?q={lat},{lng}"
+                    return lat, lng, google_maps_link
+        logging.info(f"DiscordInfo: No location information found for SSID: {ssid}, BSSID: {bssid}")
+        return None, None, None
 
-    def on_unload(self):
+    def on_unload(self, ui):
         self.ready = False
         logging.info("DiscordInfo: Plugin unloaded")
