@@ -1,7 +1,7 @@
 import logging
 import os
-import requests
-from pwnagotchi import plugins
+import requests # type: ignore
+from pwnagotchi import plugins # type: ignore
 
 class DiscordInfo(plugins.Plugin):
     __author__ = 'LOCOSP'
