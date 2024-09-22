@@ -79,7 +79,7 @@ class DiscordInfo(plugins.Plugin):
     def _get_location_info(self, ssid, bssid):
         ssid = re.sub(r'\W+', '', ssid)
         bssid = bssid.replace(':', '')
-        geojson_file = f"{self.config['bettercap']['handshakes']}{ssid}_{bssid}.gps.json"
+        geojson_file = f"{self.config['bettercap']['handshakes']}/{ssid}_{bssid}.gps.json"
         if os.path.exists(geojson_file):
             logging.debug(f"DiscordInfo: Found geo.json file: {geojson_file}")
             with open(geojson_file, 'r') as geo_file:
