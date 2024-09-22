@@ -82,9 +82,10 @@ main.plugins.discord-info.username = "PwnagotchiBot"
 
 - **Logs**: To check the logs of the `DiscordInfo` plugin, use the following command:
     ```bash
-    sudo journalctl -u pwnagotchi --no-pager | grep DiscordInfo
+    tail -f /etc/pwnagotchi/log/pwnagotchi.log | grep Discord
     ```
     or
+
     ```bash
     pwnlog
     ```
