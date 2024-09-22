@@ -98,4 +98,4 @@ This plugin is licensed under GPL3.
 ## Authors
 
 - **LOCOSP** - *Initial work* - [LOCOSP]
-- **NeonLightnig** - most powerups and features - [NeonLightning]
+- **NeonLightnig** - most powerups and features - [NeonLightning repo](https://github.com/NeonLightning)
