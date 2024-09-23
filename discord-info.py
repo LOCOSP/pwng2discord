@@ -2,7 +2,7 @@ import logging, requests, pwnagotchi, os, glob, time, re, json
 from pwnagotchi import plugins
 
 class DiscordInfo(plugins.Plugin):
-    __author__ = 'LOCOSP'
+    __author__ = 'locospnoreply@gmail.com'
     __version__ = '1.0.0'
     __license__ = 'GPL3'
     __description__ = 'Sends handshake info to a Discord webhook when a handshake is captured.'
@@ -47,24 +47,55 @@ class DiscordInfo(plugins.Plugin):
             logging.debug(f"DiscordInfo: Added location data to message: {google_maps_link}")
         else:
             logging.debug("DiscordInfo: No location data found, not adding to message.")
-        self.send_message(message, h22000_filepath)
+        self.send_message(message, ssid, bssid, h22000_filepath, filename)
 
-    def send_message(self, message, filepath=None):
+    def send_message(self, message, ssid, bssid, filename, filepath=None):
         try:
             url = self.options['webhook_url']
             username = self.options['username']
+
+            # Webhook data with embedded content
             data = {
-                "content": message,
-                "username": username
+                "username": username,
+                "embeds": [
+                    {
+                        "title": "🚨 New 🤝 handshake captured! 🚨",
+                        "description": "**Handshake Details:**\n\n🔐 **File**: " + filename + "\n\n*Stay vigilant! More details to come soon...*\n\n",
+                        "color": 16753920, 
+                        "fields": [
+                            {
+                                "name": "📡 SSID",
+                                "value": ssid,
+                                "inline": True
+                            },
+                            {
+                                "name": "⚙️ BSSID",
+                                "value": bssid,
+                                "inline": True
+                            },
+                            {
+                                "name": "🏴‍☠️ Location",
+                                "value": "comming soon",
+                                "inline": True
+                            }
+                        ],
+                        "footer": {
+                            "text": "pwng2discord (^‿‿^) powered by Pwnagotchi",
+                            "icon_url": "https://www.pwnagotchi.com/cdn/shop/files/pwnagotchishop_Icon_1589a659-8ed6-4c50-b511-34cf195c8671.png"
+                        }
+                    }
+                ]
             }
+
             if filepath and os.path.exists(filepath):
                 with open(filepath, 'rb') as file:
                     files = {
                         'file': (os.path.basename(filepath), file, 'application/octet-stream')
                     }
-                    response = requests.post(url, data=data, files=files)
+                    response = requests.post(url, data={"payload_json": json.dumps(data)}, files=files)
             else:
                 response = requests.post(url, json=data)
+
             if response.status_code in [200, 204]:
                 logging.debug("DiscordInfo: Message successfully sent to Discord")
             else:
@@ -73,6 +104,8 @@ class DiscordInfo(plugins.Plugin):
             logging.exception(f"DiscordInfo: Exception occurred while sending the message: {e}")
         except Exception as e:
             logging.exception(f"DiscordInfo: Unexpected exception occurred: {e}")
+
+
             
     def _get_location_info(self, ssid, bssid):
         ssid = re.sub(r'\W+', '', ssid)
