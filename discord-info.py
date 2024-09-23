@@ -30,31 +30,20 @@ class DiscordInfo(plugins.Plugin):
             return
         ssid = access_point.get("hostname", "Unknown SSID")
         bssid = access_point.get("mac", "Unknown BSSID")
-        message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {filename}"
         time.sleep(2)
-        logging.debug(f"DiscordInfo: Sending message to Discord: {message}")
         handshake_base = os.path.splitext(filename)[0]
         h22000_files = glob.glob(f"{handshake_base}*.22000")
         if not h22000_files:
             logging.debug(f"DiscordInfo: No matching .22000 file found for {filename}")
         else:
             h22000_filepath = h22000_files[0]
-            message = f"New handshake captured for SSID: {ssid} (BSSID: {bssid})\nFile: {h22000_filepath}"
             logging.debug(f"DiscordInfo: Found matching .22000 file: {h22000_filepath}")
-        lat, lng, google_maps_link = self._get_location_info(ssid, bssid)
-        if google_maps_link:
-            message += f"\nLocation: [{lat}, {lng}](<{google_maps_link}>)"
-            logging.debug(f"DiscordInfo: Added location data to message: {google_maps_link}")
-        else:
-            logging.debug("DiscordInfo: No location data found, not adding to message.")
-        self.send_message(message, ssid, bssid, h22000_filepath, filename)
+        self.send_message(ssid, bssid, filename, h22000_filepath)
 
-    def send_message(self, message, ssid, bssid, filename, filepath=None):
+    def send_message(self, ssid, bssid, filename, filepath=None):
         try:
             url = self.options['webhook_url']
             username = self.options['username']
-
-            # Webhook data with embedded content
             data = {
                 "username": username,
                 "embeds": [
@@ -72,11 +61,6 @@ class DiscordInfo(plugins.Plugin):
                                 "name": "⚙️ BSSID",
                                 "value": bssid,
                                 "inline": True
-                            },
-                            {
-                                "name": "🏴‍☠️ Location",
-                                "value": "comming soon",
-                                "inline": True
                             }
                         ],
                         "footer": {
@@ -86,7 +70,20 @@ class DiscordInfo(plugins.Plugin):
                     }
                 ]
             }
-
+            lat, lng, google_maps_link = self._get_location_info(ssid, bssid)
+            if google_maps_link:
+                logging.debug(f"DiscordInfo: Added location data to message: {google_maps_link}")
+                location_value = f'"[{lat}, {lng}](<{google_maps_link}>)"'
+            else:
+                logging.debug(f"DiscordInfo: No location data found, not adding to message.{google_maps_link}")
+                location_value = "N/A"
+            data["embeds"][0]["fields"].append(
+                {
+                    "name": "🏴‍☠️ Location",
+                    "value": location_value,
+                    "inline": True
+                }
+            )
             if filepath and os.path.exists(filepath):
                 with open(filepath, 'rb') as file:
                     files = {
@@ -95,7 +92,6 @@ class DiscordInfo(plugins.Plugin):
                     response = requests.post(url, data={"payload_json": json.dumps(data)}, files=files)
             else:
                 response = requests.post(url, json=data)
-
             if response.status_code in [200, 204]:
                 logging.debug("DiscordInfo: Message successfully sent to Discord")
             else:
@@ -104,13 +100,11 @@ class DiscordInfo(plugins.Plugin):
             logging.exception(f"DiscordInfo: Exception occurred while sending the message: {e}")
         except Exception as e:
             logging.exception(f"DiscordInfo: Unexpected exception occurred: {e}")
-
-
             
     def _get_location_info(self, ssid, bssid):
         ssid = re.sub(r'\W+', '', ssid)
         bssid = bssid.replace(':', '')
-        geojson_file = f"{self.config['bettercap']['handshakes']}{ssid}_{bssid}.gps.json"
+        geojson_file = f"{self.config['bettercap']['handshakes']}/{ssid}_{bssid}.gps.json"
         if os.path.exists(geojson_file):
             logging.debug(f"DiscordInfo: Found geo.json file: {geojson_file}")
             with open(geojson_file, 'r') as geo_file:
@@ -121,7 +115,7 @@ class DiscordInfo(plugins.Plugin):
                 if lat is not None and lng is not None:
                     google_maps_link = f"https://www.google.com/maps?q={lat},{lng}"
                     return lat, lng, google_maps_link
-        logging.info(f"DiscordInfo: No location information found for SSID: {ssid}, BSSID: {bssid}")
+        logging.debug(f"DiscordInfo: No location information found for SSID: {ssid}, BSSID: {bssid} GEOS: {geojson_file}")
         return None, None, None
 
     def on_unload(self, ui):
