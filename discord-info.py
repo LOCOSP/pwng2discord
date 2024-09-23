@@ -60,7 +60,7 @@ class DiscordInfo(plugins.Plugin):
                 "embeds": [
                     {
                         "title": "🚨 New 🤝 handshake captured! 🚨",
-                        "description": "**Handshake Details:**\n\n🔐 **File**: " + filename + "\n\n*Stay vigilant! More details to come soon...*\n\n",
+                        "description": "**Handshake Details:**\n\n🔐 **File**: " + filename + "\n\n",
                         "color": 16753920, 
                         "fields": [
                             {
