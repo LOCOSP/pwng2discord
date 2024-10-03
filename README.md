@@ -78,6 +78,11 @@ main.plugins.discord-info.webhook_url = "your-discord-webhook-url"
 main.plugins.discord-info.username = "PwnagotchiBot"
 ```
 
+# Screenshot
+
+![screenshot](https://github.com/user-attachments/assets/6e4a33cb-020d-40b5-a0a1-f5132e8f5030)
+
+
 ## Troubleshooting
 
 - **Logs**: To check the logs of the `DiscordInfo` plugin, use the following command:
